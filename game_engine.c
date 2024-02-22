@@ -8,6 +8,11 @@
 
 typedef _Atomic uint32_t AtomicUint32;
 
+typedef struct {
+    bool lefty;
+    AtomicUint32 state;
+} InputHolder;
+
 GameEngineSettings game_engine_settings_init() {
     GameEngineSettings settings;
     settings.target_fps = 30.0f;
@@ -86,18 +91,17 @@ static_assert(
 static const size_t keys_count = sizeof(keys_right_hand) / sizeof(keys_right_hand[0]);
 
 static void input_events_callback(const void* value, void* context) {
-    AtomicUint32* input_state = context;
+    InputHolder* holder = context;
     const InputEvent* event = value;
-    const GameKey* keys = furi_hal_rtc_is_flag_set(FuriHalRtcFlagHandOrient) ? keys_left_hand :
-                                                                               keys_right_hand;
+    const GameKey* keys = holder->lefty ? keys_left_hand : keys_right_hand;
 
     if(event->key < keys_count) {
         switch(event->type) {
         case InputTypePress:
-            *input_state |= (keys[event->key]);
+            holder->state |= (keys[event->key]);
             break;
         case InputTypeRelease:
-            *input_state &= ~(keys[event->key]);
+            holder->state &= ~(keys[event->key]);
             break;
         default:
             break;
@@ -107,7 +111,10 @@ static void input_events_callback(const void* value, void* context) {
 
 void game_engine_run(GameEngine* engine) {
     // input state
-    AtomicUint32 input_state = 0;
+    InputHolder input_state = {
+        .lefty = furi_hal_rtc_is_flag_set(FuriHalRtcFlagHandOrient),
+        .state = 0,
+    };
     uint32_t input_prev_state = 0;
 
     // set backlight if needed
@@ -145,7 +152,7 @@ void game_engine_run(GameEngine* engine) {
             time_start = time_end;
 
             // update input state
-            uint32_t input_current_state = input_state;
+            uint32_t input_current_state = input_state.state;
             InputState input = {
                 .held = input_current_state,
                 .pressed = input_current_state & ~input_prev_state,
