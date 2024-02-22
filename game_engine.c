@@ -1,5 +1,6 @@
 #include "game_engine.h"
 #include <furi.h>
+#include <furi_hal_rtc.h>
 #include <gui/gui.h>
 #include <input/input.h>
 #include <notification/notification_messages.h>
@@ -61,7 +62,7 @@ static void clock_timer_callback(void* context) {
     furi_thread_flags_set(engine->thread_id, GameThreadFlagUpdate);
 }
 
-static const GameKey keys[] = {
+static const GameKey keys_right_hand[] = {
     [InputKeyUp] = GameKeyUp,
     [InputKeyDown] = GameKeyDown,
     [InputKeyRight] = GameKeyRight,
@@ -70,11 +71,25 @@ static const GameKey keys[] = {
     [InputKeyBack] = GameKeyBack,
 };
 
-static const size_t keys_count = sizeof(keys) / sizeof(keys[0]);
+static const GameKey keys_left_hand[] = {
+    [InputKeyUp] = GameKeyDown,
+    [InputKeyDown] = GameKeyUp,
+    [InputKeyRight] = GameKeyLeft,
+    [InputKeyLeft] = GameKeyRight,
+    [InputKeyOk] = GameKeyOk,
+    [InputKeyBack] = GameKeyBack,
+};
+static_assert(
+    sizeof(keys_right_hand) == sizeof(keys_left_hand),
+    "keys_right_hand and keys_left_hand do not match!");
+
+static const size_t keys_count = sizeof(keys_right_hand) / sizeof(keys_right_hand[0]);
 
 static void input_events_callback(const void* value, void* context) {
     AtomicUint32* input_state = context;
     const InputEvent* event = value;
+    const GameKey* keys = furi_hal_rtc_is_flag_set(FuriHalRtcFlagHandOrient) ? keys_left_hand :
+                                                                               keys_right_hand;
 
     if(event->key < keys_count) {
         switch(event->type) {
